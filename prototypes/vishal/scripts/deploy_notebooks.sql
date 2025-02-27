@@ -5,17 +5,11 @@ Author:       Vishal prasanna
 Last Updated: 2/25/2025
 -----------------------------------------------------------------------------*/
 
--- See https://docs.snowflake.com/en/LIMITEDACCESS/execute-immediate-from-template
-
--- Create the Notebooks
---USE SCHEMA {{env}}_SCHEMA;
-
-CREATE OR REPLACE NOTEBOOK IDENTIFIER('"CRYPTO_DB"."{{env}}_SCHEMA"."{{env}}_06_load_excel_files"')
+-- Create the Yahoo Finance API Notebook
+CREATE OR REPLACE NOTEBOOK IDENTIFIER('"CRYPTO_DB"."{{env}}_SCHEMA"."{{env}}_Yahoo_Finance_API"')
     FROM '@"CRYPTO_DB"."INTEGRATIONS"."CRYPTO_GIT_REPO"/branches/"{{branch}}"/prototypes/vishal/notebooks/01.Yahoo_Finance_API/'
     QUERY_WAREHOUSE = 'CRYPTO_WH'
     MAIN_FILE = '01.Yahoo_Finance_API.ipynb';
 
-ALTER NOTEBOOK "CRYPTO_DB"."{{env}}_SCHEMA"."{{env}}_01.Yahoo_Finance_API" ADD LIVE VERSION FROM LAST;
-
-
-
+-- Add a live version
+ALTER NOTEBOOK "CRYPTO_DB"."{{env}}_SCHEMA"."{{env}}_Yahoo_Finance_API" ADD LIVE VERSION FROM LAST;
