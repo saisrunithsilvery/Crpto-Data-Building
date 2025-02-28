@@ -40,7 +40,7 @@ The data pipeline consists of the following components:
    - Snowflake worksheets for SQL-based exploration
 
 ## Repository Structure
-
+```
 crypto_data_pipeline/
 ├── prototypes/vishal/                # Prototype directory
 │   ├── notebooks/                    # Jupyter notebooks for each pipeline step
@@ -73,6 +73,8 @@ crypto_data_pipeline/
 ├── LICENSE                          # License information
 ├── README.md                        # Project documentation
 └── requirements.txt                 # Python dependencies
+
+```
 
 ## Features
 
