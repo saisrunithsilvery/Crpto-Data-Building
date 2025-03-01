@@ -122,6 +122,7 @@ crypto_data_pipeline/
 1. Run the setup script to create the necessary Snowflake objects:
    ```
    snowsql -f scripts/setup.sql
+   
    ```
 
 ### Pipeline Execution
