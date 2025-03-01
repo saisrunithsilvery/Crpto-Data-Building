@@ -1,35 +1,29 @@
-name: Deploy Cryptocurrency Data Pipeline
+name: Deploy Crypto Pipeline
 
-# Controls when the action will run
 on:
   push:
     branches:
       - main
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up Python environment
       - name: Setup Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # Install required Python packages
       - name: Install Python packages
         run: |
-          pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Deploy SQL setup and create tables
-      - name: Deploy SQL Objects
+      - name: Setup Snowflake Environment
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -37,24 +31,11 @@ jobs:
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
-          # Create connection string for snowsql
-          CONNECTION_PARAMS="--accountname $SNOWFLAKE_ACCOUNT --username $SNOWFLAKE_USER --password $SNOWFLAKE_PASSWORD --rolename $SNOWFLAKE_ROLE --warehousename $SNOWFLAKE_WAREHOUSE --dbname $SNOWFLAKE_DATABASE"
-          
-          # Install SnowSQL
-          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-1.2.9-linux_x86_64.bash
-          bash snowsql-1.2.9-linux_x86_64.bash
-          
-          # Run initial setup script
-          echo "Setting up Snowflake environment..."
-          ~/.snowsql/bin/snowsql $CONNECTION_PARAMS -f ./scripts/setup.sql
-          
-          # Run create tables script
-          echo "Creating database tables..."
-          ~/.snowsql/bin/snowsql $CONNECTION_PARAMS -f ./scripts/create_tables.sql
+          echo "Snowflake environment variables set"
 
-      # Deploy Notebooks to Snowflake
-      - name: Deploy Notebooks
+      - name: Deploy Notebooks to Snowflake
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -64,13 +45,27 @@ jobs:
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
-          CONNECTION_PARAMS="--accountname $SNOWFLAKE_ACCOUNT --username $SNOWFLAKE_USER --password $SNOWFLAKE_PASSWORD --rolename $SNOWFLAKE_ROLE --warehousename $SNOWFLAKE_WAREHOUSE --dbname $SNOWFLAKE_DATABASE --schemaname $SNOWFLAKE_SCHEMA"
-          
-          echo "Deploying notebooks..."
-          ~/.snowsql/bin/snowsql $CONNECTION_PARAMS -f ./scripts/deploy_notebooks.sql
-      
-      # Deploy Task DAG for orchestration
-      - name: Deploy Task Orchestration
+          # Pull latest from Snowflake Git Repository
+          snow sql -q "ALTER GIT REPOSITORY DEMO_GIT_REPO FETCH" \
+            --temporary-connection \
+            --account $SNOWFLAKE_ACCOUNT \
+            --user $SNOWFLAKE_USER \
+            --role $SNOWFLAKE_ROLE \
+            --warehouse $SNOWFLAKE_WAREHOUSE \
+            --database $SNOWFLAKE_DATABASE \
+            --schema $SNOWFLAKE_SCHEMA
+
+          # Execute SQL script to deploy notebooks
+          snow sql -q "EXECUTE IMMEDIATE FROM @DEMO_GIT_REPO/branches/main/scripts/deploy_notebooks.sql USING (env => 'PROD', branch => 'main')" \
+            --temporary-connection \
+            --account $SNOWFLAKE_ACCOUNT \
+            --user $SNOWFLAKE_USER \
+            --role $SNOWFLAKE_ROLE \
+            --warehouse $SNOWFLAKE_WAREHOUSE \
+            --database $SNOWFLAKE_DATABASE \
+            --schema $SNOWFLAKE_SCHEMA
+
+      - name: Deploy Task DAG (Optional - If you have Python DAG orchestration)
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -80,33 +75,4 @@ jobs:
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
-          echo "Setting up task orchestration..."
-          python ./scripts/deploy_task_dag.py $SNOWFLAKE_DATABASE $SNOWFLAKE_SCHEMA
-      
-      # Run a test execution to verify pipeline
-      - name: Test Pipeline Execution
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
-        run: |
-          CONNECTION_PARAMS="--accountname $SNOWFLAKE_ACCOUNT --username $SNOWFLAKE_USER --password $SNOWFLAKE_PASSWORD --rolename $SNOWFLAKE_ROLE --warehousename $SNOWFLAKE_WAREHOUSE --dbname $SNOWFLAKE_DATABASE --schemaname $SNOWFLAKE_SCHEMA"
-          
-          echo "Testing pipeline execution..."
-          cat > test_pipeline.sql << 'EOF'
-          -- Execute the first task in the pipeline to trigger the DAG
-          EXECUTE TASK HARMONIZED_CRYPTO.UPDATE_VOLATILITY_TASK;
-          
-          -- Verify the results
-          SELECT COUNT(*) FROM ANALYTICS_CRYPTO.DAILY_CRYPTO_METRICS;
-          SELECT COUNT(*) FROM ANALYTICS_CRYPTO.WEEKLY_CRYPTO_METRICS;
-          SELECT COUNT(*) FROM ANALYTICS_CRYPTO.MONTHLY_CRYPTO_METRICS;
-          EOF
-          
-          ~/.snowsql/bin/snowsql $CONNECTION_PARAMS -f test_pipeline.sql
-          
-          echo "Pipeline deployment and testing complete!"
+          python scripts/deploy_task_dag.py $SNOWFLAKE_DATABASE $SNOWFLAKE_SCHEMA
