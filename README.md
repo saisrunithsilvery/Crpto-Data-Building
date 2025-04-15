@@ -16,7 +16,7 @@ The pipeline focuses on Bitcoin, Ethereum, and Dogecoin with data from January 2
 
 ## Architecture
 
-<img width="791" alt="image" src="https://github.com/user-attachments/assets/fbf1e021-a30f-4bb4-9bd2-d49cf2432d03" />
+https://github.com/DAMG7245/Assignment3B/blob/main/assets/archdiag.png
 
 
 The data pipeline consists of the following components:
